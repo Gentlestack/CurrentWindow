@@ -1,121 +1,30 @@
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-
+#include <string>
 #include <iostream>
+#include <stdio.h>
+#include <unistd.h>
+using namespace std;
 
-Window* findWindows( Display* display, ulong* winCount ) {
-    Atom actualType;
-    int format;
-    ulong bytesAfter;
-    unsigned char* list = NULL;
-    Status status = XGetWindowProperty(
-                        display,
-                        DefaultRootWindow( display ),
-                        XInternAtom( display, "_NET_CLIENT_LIST", False ),
-                        0L,
-                        ~0L,
-                        False,
-                        XA_WINDOW,
-                        &actualType,
-                        &format,
-                        winCount,
-                        &bytesAfter,
-                        &list
-                    );
-
-    if( status != Success ) {
-        *winCount = 0;
-        return NULL;
+inline std::string exec(char* cmd) {
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) return "ERROR";
+    char buffer[128];
+    std::string result = "";
+    while(!feof(pipe)) {
+        if(fgets(buffer, 128, pipe) != NULL)
+                result += buffer;
     }
-
-    return reinterpret_cast< Window* >( list );
+    pclose(pipe);
+    return result;
 }
 
-char* getWindowName( Display* display, Window win ) {
-    Atom actualType;
-    int format;
-    ulong count, bytesAfter;
-    unsigned char* name = NULL;
-    Status status = XGetWindowProperty(
-                        display,
-                        win,
-                        XInternAtom( display, "_NET_WM_NAME", False ),
-                        0L,
-                        ~0L,
-                        False,
-                        XInternAtom( display, "UTF8_STRING", False ),
-                        &actualType,
-                        &format,
-                        &count,
-                        &bytesAfter,
-                        &name
-                    );
-
-    if( status != Success ) {
-        return NULL;
+int main()
+{
+    while (true)
+    {
+        cout << exec("xprop -id $(xprop -root | awk '/_NET_ACTIVE_WINDOW\\(WINDOW\\)/{print $NF}') | awk '/_NET_WM_PID\\(CARDINAL\\)/{print $NF}'").c_str(); 
+        sleep(10);
     }
-
-    if( name == NULL ) {
-        Status status = XGetWindowProperty(
-                            display,
-                            win,
-                            XInternAtom( display, "WM_NAME", False ),
-                            0L,
-                            ~0L,
-                            False,
-                            AnyPropertyType,
-                            &actualType,
-                            &format,
-                            &count,
-                            &bytesAfter,
-                            &name
-                        );
-
-        if( status != Success ) {
-            return NULL;
-        }
-    }
-
-    return reinterpret_cast< char* >( name );
-}
-
-int main() {
-    setlocale( LC_ALL, "" );
-
-    if( Display* display = XOpenDisplay( NULL ) ) {
-        ulong count = 0;
-        Window* wins = findWindows( display, &count );
-        for( ulong i = 0; i < count; ++i ) {
-            Window w = wins[ i ];
-            std::wcout << w;
-            if( char* name = getWindowName( display, w ) ) {
-                std::wcout << ": " << name;
-                XFree( name );
-            }
-            std::wcout << std::endl;
-
-            XWindowAttributes attrs;
-            if( XGetWindowAttributes( display, w, &attrs ) ) {
-                Window child;
-                if( XTranslateCoordinates(
-                            display,
-                            w, attrs.root,
-                            0, 0,
-                            &attrs.x, &attrs.y,
-                            &child
-                        ) ) {
-                    
-                    std::wcout << std::endl;
-                }
-            }
-        }
-
-        if( wins ) {
-            XFree( wins );
-        }
-
-        XCloseDisplay( display );
-    }
-
-    return 0;
+    //we uses \\ instead of \ ( \ is a escape character ) in this string
+    
+ return 0;
 }
